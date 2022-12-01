@@ -1,0 +1,1 @@
+from .scn import SphericalChannelNetwork
