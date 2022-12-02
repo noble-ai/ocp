@@ -12,6 +12,6 @@ setup(
     version="0.0.3",
     description="Machine learning models for use in catalysis as part of the Open Catalyst Project",
     url="https://github.com/Open-Catalyst-Project/ocp",
-    packages=find_packages(),
+    packages=find_packages() + find_packages(where="./models/scn") ,
     include_package_data=True,
 )
