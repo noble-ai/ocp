@@ -13,5 +13,5 @@ from .gemnet_gp import GraphParallelGemNetT as GraphParallelGemNetT
 from .gemnet_oc import GemNetOC
 from .painn import PaiNN
 from .schnet import SchNetWrap as SchNet
-from .scn.scn import SphericalChannelNetwork
+from .scn import SphericalChannelNetwork
 from .spinconv import spinconv
