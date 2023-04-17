@@ -601,6 +601,38 @@ class ForcesTrainer(BaseTrainer):
         metrics = evaluator.eval(out, target, prev_metrics=metrics)
         return metrics
 
+    def _freeze_atoms(self, batch, margin=3):
+        ele_dict = {
+            "Cu": 29,
+            "Co": 27,
+            "Ni": 28,
+            "Mn": 25,
+            "Fe": 26,
+            "Al": 13,
+        }
+        folder_ele = os.path.basename(os.path.normpath(self.config['val_dataset']['src']))
+        active_ele = [13] + [ele_dict[ele] for ele in ele_dict if ele in folder_ele]
+        for i in range(len(batch)):
+            masked_active = batch[i]['atomic_numbers'] == 0
+            for a_ele in active_ele:
+                masked_active = masked_active | (batch[i]['atomic_numbers'] == a_ele)
+            actives = []
+            init_index = 0
+            batch_indexes = []
+            for k in [int(x) for x in batch[0]['natoms']]:
+                pos_k = batch[i]['pos'][init_index:init_index+k]
+                actives += [pos_k[masked_active[init_index:init_index+k]]]
+                init_index += k
+                batch_indexes.append(init_index)
+
+            for j, pos in enumerate(batch[i]['pos']):
+                # pick the relavent active atoms given the batch index
+                active = actives[[x > j for x in batch_indexes].index(True)]
+                dist = (active - pos).pow(2).sum(1).sqrt()
+                batch[i]['fixed'][j] = 1 if dist.min() > margin else 0
+        
+        return batch
+
     def run_relaxations(self, split="val"):
         ensure_fitted(self._unwrapped_model)
 
@@ -642,8 +674,12 @@ class ForcesTrainer(BaseTrainer):
                 logging.info(f"Skipping batch: {batch[0].sid.tolist()}")
                 continue
 
+            # TODO: This is where freeze happens. Waiting for a brighter day.
+            # frozen_batch = self._freeze_atoms(batch)
+            frozen_batch = batch
+
             relaxed_batch = ml_relax(
-                batch=batch,
+                batch=frozen_batch,
                 model=self,
                 steps=self.config["task"].get("relaxation_steps", 200),
                 fmax=self.config["task"].get("relaxation_fmax", 0.0),
@@ -790,6 +826,14 @@ class ForcesTrainer(BaseTrainer):
                         'target': target,
                         'prediction': prediction
                     }
-
+        
+        prediction = {
+            "energy": relaxed_batch.y,
+            "positions": relaxed_batch.pos[mask],
+            "cell": relaxed_batch.cell,
+            "pbc": torch.tensor([True, True, True]),
+            "natoms": torch.LongTensor(natoms_free),
+        }
+        return {'prediction': prediction}
         if self.ema:
             self.ema.restore()
