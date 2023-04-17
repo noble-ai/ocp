@@ -279,6 +279,9 @@ class ForcesTrainer(BaseTrainer):
                 checkpoint_file="best_checkpoint.pt",
                 training_state=False,
             )
+            if not hasattr(self, 'best_checkpoint_epoch'):
+                self.best_checkpoint_epoch = []
+            self.best_checkpoint_epoch += [f"{self.epoch}: {val_metrics['loss']['metric']}"]
             if self.test_loader is not None:
                 self.predict(
                     self.test_loader,
@@ -781,6 +784,12 @@ class ForcesTrainer(BaseTrainer):
 
                 if distutils.is_master():
                     logging.info(metrics)
+                    return {
+                        'metrics_rs': metrics_is2rs,
+                        'metrics_re': metrics_is2re,
+                        'target': target,
+                        'prediction': prediction
+                    }
 
         if self.ema:
             self.ema.restore()
